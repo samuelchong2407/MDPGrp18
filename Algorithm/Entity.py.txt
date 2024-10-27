@@ -1,0 +1,221 @@
+from typing import List
+from consts import Orientation, EXPANDED_ZONE, PHOTO_COST
+from helper import is_within_bounds
+
+
+class GridComponent:
+    """Basic class for all the components of the grid + robot"""
+
+    def __init__(self, x, y, orientation: Orientation = Orientation.UP, photo_id=-1, penalty=0):
+        self.x = x
+        self.y = y
+        self.orientation = orientation
+        self.photo_id = photo_id
+        self.penalty = penalty
+
+    def cmp_position(self, x, y) -> bool:
+        """Returns true if given coord is same as own coord"""
+        return self.x == x and self.y == y
+
+    def is_eq(self, x, y, orientation):
+        """Returns true if given coord and orientation are the same"""
+        return self.x == x and self.y == y and self.orientation == orientation
+
+    def __repr__(self):
+        """Returns the state of this component"""
+        return "x: {}, y: {}, orientation: {}, photo_id: {}".format(self.x, self.y, self.orientation, self.photo_id)
+
+    def set_photo_id(self, photo_id):
+        """Set the photo id of the component"""
+        self.photo_id = photo_id
+
+    def get_dict(self):
+        """Returns a dictionary representation of the component"""
+        return {'x': self.x, 'y': self.y, 'orientation': self.orientation, 'photo_id': self.photo_id}
+
+
+class Obstacle(GridComponent):
+    """Child of GridComponent class"""
+
+    def __init__(self, x: int, y: int, orientation: Orientation, barrier_id: int):
+        super().__init__(x, y, orientation)
+        self.barrier_id = barrier_id
+
+    def __eq__(self, other):
+        """Similar to is_eq"""
+        return self.x == other.x and self.y == other.y and self.orientation == other.orientation
+
+    def get_view_states(self, retrying) -> List[GridComponent]:
+        """get possible view state for obstacle, if retrying true, we add more positions behind like a t-shape"""
+        cells = []
+
+        if self.orientation == Orientation.UP:
+            if not retrying:
+                if is_within_bounds(self.x, self.y + 1 + EXPANDED_ZONE * 2):
+                    cells.append(GridComponent(self.x, self.y + 1 + EXPANDED_ZONE * 2, Orientation.DOWN, self.barrier_id, 5))
+                if is_within_bounds(self.x, self.y + 2 + EXPANDED_ZONE * 2):
+                    cells.append(GridComponent(self.x, self.y + 2 + EXPANDED_ZONE * 2, Orientation.DOWN, self.barrier_id, 0))
+                if is_within_bounds(self.x + 1, self.y + 2 + EXPANDED_ZONE * 2):
+                    cells.append(GridComponent(self.x + 1, self.y + 2 + EXPANDED_ZONE * 2, Orientation.DOWN, self.barrier_id, PHOTO_COST))
+                if is_within_bounds(self.x - 1, self.y + 2 + EXPANDED_ZONE * 2):
+                    cells.append(GridComponent(self.x - 1, self.y + 2 + EXPANDED_ZONE * 2, Orientation.DOWN, self.barrier_id, PHOTO_COST))
+
+            else:
+                if is_within_bounds(self.x, self.y + 2 + EXPANDED_ZONE * 2):
+                    cells.append(GridComponent(self.x, self.y + 2 + EXPANDED_ZONE * 2, Orientation.DOWN, self.barrier_id, 0))
+                if is_within_bounds(self.x, self.y + 3 + EXPANDED_ZONE * 2):
+                    cells.append(GridComponent(self.x, self.y + 3 + EXPANDED_ZONE * 2, Orientation.DOWN, self.barrier_id, 0))
+                if is_within_bounds(self.x + 1, self.y + 2 + EXPANDED_ZONE * 2):
+                    cells.append(GridComponent(self.x + 1, self.y + 2 + EXPANDED_ZONE * 2, Orientation.DOWN, self.barrier_id, PHOTO_COST))
+                if is_within_bounds(self.x - 1, self.y + 2 + EXPANDED_ZONE * 2):
+                    cells.append(GridComponent(self.x - 1, self.y + 2 + EXPANDED_ZONE * 2, Orientation.DOWN, self.barrier_id, PHOTO_COST))
+
+        elif self.orientation == Orientation.DOWN:
+            if not retrying:
+                if is_within_bounds(self.x, self.y - 1 - EXPANDED_ZONE * 2):
+                    cells.append(GridComponent(self.x, self.y - 1 - EXPANDED_ZONE * 2, Orientation.UP, self.barrier_id, 5))
+                if is_within_bounds(self.x, self.y - 2 - EXPANDED_ZONE * 2):
+                    cells.append(GridComponent(self.x, self.y - 2 - EXPANDED_ZONE * 2, Orientation.UP, self.barrier_id, 0))
+                if is_within_bounds(self.x + 1, self.y - 2 - EXPANDED_ZONE * 2):
+                    cells.append(GridComponent(self.x + 1, self.y - 2 - EXPANDED_ZONE * 2, Orientation.UP, self.barrier_id, PHOTO_COST))
+                if is_within_bounds(self.x - 1, self.y - 2 - EXPANDED_ZONE * 2):
+                    cells.append(GridComponent(self.x - 1, self.y - 2 - EXPANDED_ZONE * 2, Orientation.UP, self.barrier_id, PHOTO_COST))
+
+            else:
+                if is_within_bounds(self.x, self.y - 2 - EXPANDED_ZONE * 2):
+                    cells.append(GridComponent(self.x, self.y - 2 - EXPANDED_ZONE * 2, Orientation.UP, self.barrier_id, 0))
+                if is_within_bounds(self.x, self.y - 3 - EXPANDED_ZONE * 2):
+                    cells.append(GridComponent(self.x, self.y - 3 - EXPANDED_ZONE * 2, Orientation.UP, self.barrier_id, 0))
+                if is_within_bounds(self.x + 1, self.y - 2 - EXPANDED_ZONE * 2):
+                    cells.append(GridComponent(self.x + 1, self.y - 2 - EXPANDED_ZONE * 2, Orientation.UP, self.barrier_id, PHOTO_COST))
+                if is_within_bounds(self.x - 1, self.y - 2 - EXPANDED_ZONE * 2):
+                    cells.append(GridComponent(self.x - 1, self.y - 2 - EXPANDED_ZONE * 2, Orientation.UP, self.barrier_id, PHOTO_COST))
+
+        elif self.orientation == Orientation.RIGHT:
+            if not retrying:
+                if is_within_bounds(self.x + 1 + EXPANDED_ZONE * 2, self.y):
+                    cells.append(GridComponent(self.x + 1 + EXPANDED_ZONE * 2, self.y, Orientation.LEFT, self.barrier_id, 5))
+                if is_within_bounds(self.x + 2 + EXPANDED_ZONE * 2, self.y):
+                    cells.append(GridComponent(self.x + 2 + EXPANDED_ZONE * 2, self.y, Orientation.LEFT, self.barrier_id, 0))
+                if is_within_bounds(self.x + 2 + EXPANDED_ZONE * 2, self.y + 1):
+                    cells.append(GridComponent(self.x + 2 + EXPANDED_ZONE * 2, self.y + 1, Orientation.LEFT, self.barrier_id, PHOTO_COST))
+                if is_within_bounds(self.x + 2 + EXPANDED_ZONE * 2, self.y - 1):
+                    cells.append(GridComponent(self.x + 2 + EXPANDED_ZONE * 2, self.y - 1, Orientation.LEFT, self.barrier_id, PHOTO_COST))
+
+            else:
+                if is_within_bounds(self.x + 2 + EXPANDED_ZONE * 2, self.y):
+                    cells.append(GridComponent(self.x + 2 + EXPANDED_ZONE * 2, self.y, Orientation.LEFT, self.barrier_id, 0))
+                if is_within_bounds(self.x + 3 + EXPANDED_ZONE * 2, self.y):
+                    cells.append(GridComponent(self.x + 3 + EXPANDED_ZONE * 2, self.y, Orientation.LEFT, self.barrier_id, 0))
+                if is_within_bounds(self.x + 2 + EXPANDED_ZONE * 2, self.y + 1):
+                    cells.append(GridComponent(self.x + 2 + EXPANDED_ZONE * 2, self.y + 1, Orientation.LEFT, self.barrier_id, PHOTO_COST))
+                if is_within_bounds(self.x + 2 + EXPANDED_ZONE * 2, self.y - 1):
+                    cells.append(GridComponent(self.x + 2 + EXPANDED_ZONE * 2, self.y - 1, Orientation.LEFT, self.barrier_id, PHOTO_COST))
+
+        elif self.orientation == Orientation.LEFT:
+            if not retrying:
+                if is_within_bounds(self.x - 1 - EXPANDED_ZONE * 2, self.y):
+                    cells.append(GridComponent(self.x - 1 - EXPANDED_ZONE * 2, self.y, Orientation.RIGHT, self.barrier_id, 5))
+                if is_within_bounds(self.x - 2 - EXPANDED_ZONE * 2, self.y):
+                    cells.append(GridComponent(self.x - 2 - EXPANDED_ZONE * 2, self.y, Orientation.RIGHT, self.barrier_id, 0))
+                if is_within_bounds(self.x - 2 - EXPANDED_ZONE * 2, self.y + 1):
+                    cells.append(GridComponent(self.x - 2 - EXPANDED_ZONE * 2, self.y + 1, Orientation.RIGHT, self.barrier_id, PHOTO_COST))
+                if is_within_bounds(self.x - 2 - EXPANDED_ZONE * 2, self.y - 1):
+                    cells.append(GridComponent(self.x - 2 - EXPANDED_ZONE * 2, self.y - 1, Orientation.RIGHT, self.barrier_id, PHOTO_COST))
+
+            else:
+                if is_within_bounds(self.x - 2 - EXPANDED_ZONE * 2, self.y):
+                    cells.append(GridComponent(self.x - 2 - EXPANDED_ZONE * 2, self.y, Orientation.RIGHT, self.barrier_id, 0))
+                if is_within_bounds(self.x - 3 - EXPANDED_ZONE * 2, self.y):
+                    cells.append(GridComponent(self.x - 3 - EXPANDED_ZONE * 2, self.y, Orientation.RIGHT, self.barrier_id, 0))
+                if is_within_bounds(self.x - 2 - EXPANDED_ZONE * 2, self.y + 1):
+                    cells.append(GridComponent(self.x - 2 - EXPANDED_ZONE * 2, self.y + 1, Orientation.RIGHT, self.barrier_id, PHOTO_COST))
+                if is_within_bounds(self.x - 2 - EXPANDED_ZONE * 2, self.y - 1):
+                    cells.append(GridComponent(self.x - 2 - EXPANDED_ZONE * 2, self.y - 1, Orientation.RIGHT, self.barrier_id, PHOTO_COST))
+
+        return cells
+
+class Grid:
+    """
+    Has its dimensions and the list of obstacles
+    """
+    def __init__(self, size_x: int, size_y: int):
+        self.size_x = size_x
+        self.size_y = size_y
+        self.obstacles: List[Obstacle] = []
+
+    def add_obstacle(self, obstacle: Obstacle):
+        """note : it ignores if duplicate obstacle is trying to be addded
+        """
+        to_add = True
+        for ob in self.obstacles:
+            if ob == obstacle:
+                to_add = False
+                break
+
+        if to_add:
+            self.obstacles.append(obstacle)
+
+    def reset_obstacles(self):
+        self.obstacles = []
+
+    def get_obstacles(self):
+        """
+        gets the list of obstacles in grid
+        """
+        return self.obstacles
+
+    def reachable(self, x: int, y: int, turn=False, preTurn=False) -> bool:
+        """Checks whether the given x,y coordinate is reachable/safe. Criterion is as such:
+        - it should be 4 cell states away from obstacle (x+y) distance
+        - and bigger distance (x/y) shoud be from all obstacles too
+        """
+        
+        if not self.is_valid_coord(x, y):
+            return False
+
+        for ob in self.obstacles:
+            if ob.x == 4 and ob.y <= 4 and x < 4 and y < 4:
+                continue
+
+            if abs(ob.x - x) + abs(ob.y - y) >= 4:
+                continue
+            if turn:
+                if max(abs(ob.x - x), abs(ob.y - y)) < EXPANDED_ZONE * 2 + 1:
+                    return False
+            if preTurn:
+                if max(abs(ob.x - x), abs(ob.y - y)) < EXPANDED_ZONE * 2 + 1:
+                    return False
+            else:
+                if max(abs(ob.x - x), abs(ob.y - y)) < 2:
+                    return False
+
+        return True
+
+    def is_valid_coord(self, x: int, y: int) -> bool:
+        """ if coordinate is within dimensions of grid return true
+        """
+        if x < 1 or x >= self.size_x - 1 or y < 1 or y >= self.size_y - 1:
+            return False
+
+        return True
+
+    def is_valid_cell_state(self, state: GridComponent) -> bool:
+        """ caller function for is_valid_coord()
+        """
+        return self.is_valid_coord(state.x, state.y)
+
+    def get_view_obstacle_positions(self, retrying) -> List[List[GridComponent]]:
+        """
+        This combines, get_vieew_state with reachable, to return viewstates that are reachable
+        """
+        optimal_positions = []
+        for obstacle in self.obstacles:
+            if obstacle.orientation == 8:
+                continue
+            else:
+                view_states = [view_state for view_state in obstacle.get_view_states(
+                    retrying) if self.reachable(view_state.x, view_state.y)]
+            optimal_positions.append(view_states)
+
+        return optimal_positions

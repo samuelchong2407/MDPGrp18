@@ -1,0 +1,628 @@
+import React, { useState, useEffect, useRef } from 'react';
+import QueryAPI from "./QueryAPI";
+import './App.css'; // Include your CSS styles
+
+const CELL_SIZE = 30;
+const GRID_WIDTH = 20;
+const GRID_HEIGHT = 20;
+
+const App = () => {
+  const [carPosition, setCarPosition] = useState((GRID_HEIGHT-2) * GRID_WIDTH+1); // Bottom-left corner
+  const [carX, setCarX] = useState(1);
+  const [carY, setCarY] = useState(1);
+  const [obst, setObst] = useState([]);
+  const [message1, setMessage1] = useState('Executed Command:');
+  const [message2, setMessage2] = useState('Commands Received?');
+  const [message3, setMessage3] = useState('Number of Commands: ');
+  const [commandNumber, setCommandNumber] = useState('-');
+  const [optimalDistance, setOptimalDistance] = useState('-');
+  const [message4, setMessage4] = useState('Non optimal distance: ');
+  const [nonOptimalDistance, setNonOptimalDistance] = useState('-');
+  const [commandsReceived, setCommandsReceived] = useState('No');
+  const [commandString, setCommandString] = useState('-');
+  const [obstacles, setObstacles] = useState(new Map());
+  const [carDirection, setCarDirection] = useState('up'); // Initial direction
+  const [carPath, setCarPath] = useState([]); // Initial path with starting position
+  const commandsRef = useRef([]);
+  const commands = [];
+  useEffect(() => {
+    console.log('Car position:', carPosition, 'Direction:', carDirection);
+    // console.log('up limit, must be more than or equal to:', GRID_WIDTH);
+    // console.log('down limit, must be less than:', GRID_WIDTH * (GRID_HEIGHT - 1));
+    // console.log('left limit, must not equal to zero:', carPosition % GRID_WIDTH);
+    // console.log('right limit, must not equal to zero:', (carPosition + 1) % GRID_WIDTH);
+  }, [carPosition, carDirection]);
+
+  const generateNewID = () => {
+    while (true) {
+      let new_id = Math.floor(Math.random() * 10) + 1; // just try to generate an id;
+      let ok = true;
+      for (const ob of obst) {
+        if (ob.id === new_id) {
+          ok = false;
+          break;
+        }
+      }
+      if (ok) {
+        return new_id;
+      }
+    }
+  };
+
+  const checkObstacles = (position) => {
+    if (obstacles.has(position-20)){
+      console.log("obstacle found at position -20:", position-20);
+      return false;
+    }
+    if (obstacles.has(position-21)){
+      console.log("obstacle found at position-21:", position-21);
+      return false;
+    }
+    if (obstacles.has(position-19)){
+      console.log("obstacle found at position-19:", position-19);
+      return false;
+    }
+    if (obstacles.has(position)){
+      console.log("obstacle found at position:", position);
+      return false;
+    }
+    if (obstacles.has(position+1)){
+      console.log("obstacle found at position+1:", position+1);
+      return false;
+    }
+    if (obstacles.has(position-1)){
+      console.log("obstacle found at position-1:", position-1);
+      return false;
+    }
+    if (obstacles.has(position+20)){
+      console.log("obstacle found at position+20:", position+20);
+      return false;
+    }
+    if (obstacles.has(position+21)){
+      console.log("obstacle found at position+21:", position+21);
+      return false;
+    }
+    if (obstacles.has(position+19)){
+      console.log("obstacle found at position+19:", position+19);
+      return false;
+    }
+   
+    return true;
+
+  }
+
+  const updateMessage = (text) => {
+    setCommandString(text);
+  };
+
+  const directionConvert = (direction) =>{
+    if (direction === 'up'){
+      return 0;
+    }
+    if (direction === 'down'){
+      return 4;
+    }
+    if (direction === 'left'){
+      return 6;
+    }
+    if (direction === 'right'){
+      return 2;
+    }
+  };
+
+  const toggleObstacle = (index) => {
+    const directions = ['up', 'right', 'down', 'left'];
+    const currentDirection = obstacles.get(index);
+    let obstDirection = currentDirection;
+    const newObstacles = new Map(obstacles);
+    let obstaclesArray = [...obst];
+    console.log('obstacle position: ', index);
+    if (currentDirection === undefined) {
+      newObstacles.set(index, 'up');
+      obstDirection = 'up';
+      obstaclesArray.push({
+        x: index % 20,
+        y: 19 - Math.floor(index / 20),
+        d: directionConvert(obstDirection),
+        id: generateNewID(),
+      });
+      setObst(obstaclesArray);
+      console.log('obstacles array:', obstaclesArray);
+    } else {
+      const nextIndex = (directions.indexOf(currentDirection) + 1) % (directions.length + 1);
+      if (nextIndex === directions.length) {
+        newObstacles.delete(index); // Remove obstacle after all directions
+        obstaclesArray = obstaclesArray.filter(obstacle => obstacle.x !== index % 20 || obstacle.y !== 19 - Math.floor(index / 20));
+        setObst(obstaclesArray);
+        console.log('obstacles array:', obstaclesArray);
+      } else {
+        newObstacles.set(index, directions[nextIndex]);
+        obstDirection = directionConvert(directions[nextIndex]);
+        const obstacle = obstaclesArray.find(obstacle => obstacle.x === index % 20 && obstacle.y === 19 - Math.floor(index / 20));
+        obstacle.d = obstDirection;
+        setObst(obstaclesArray);
+        console.log('obstacles array:', obstaclesArray);
+      }
+    }
+    setObstacles(newObstacles);
+  };
+
+  const resetObstacles = () => {
+    setObstacles(new Map());
+    setObst([]);
+    commandsRef.current.length = 0;
+    setCommandString('-');
+    setCommandsReceived('No');
+    setOptimalDistance('-');
+  };
+
+  const resetCar = () => {
+    let newPosition = (GRID_HEIGHT-2) * GRID_WIDTH+1;
+    setCarPosition(newPosition);
+    updateCarCoordinates(newPosition);
+    setCarDirection('up');
+    commandsRef.current.length = 0;
+    setCommandString('-');
+    setCommandsReceived('No');
+    setOptimalDistance('-');
+  };
+
+  const resetAll = () => {
+    resetObstacles();
+    resetCar();
+    commandsRef.current.length = 0;
+    setCommandString('-');
+    setCommandsReceived('No');
+    setOptimalDistance('-');
+  };
+
+  const updateCarCoordinates = (carPosition) => {
+    setCarY(19 - Math.floor(carPosition / 20));
+    setCarX(carPosition % 20);
+  };
+
+  const moveCar = (direction) => {
+    let newPosition = carPosition;
+    switch (direction) {
+      case 'up':
+        if (carDirection === 'up')
+          if (carPosition-20 >= GRID_WIDTH && checkObstacles(carPosition-20)) newPosition -= GRID_WIDTH;
+        if (carDirection === 'left')
+          if ((carPosition % GRID_WIDTH)-1 !== 0 && checkObstacles(carPosition-1)) newPosition -= 1;
+        if (carDirection === 'down')
+          if (carPosition+20 < GRID_WIDTH * (GRID_HEIGHT - 1) && checkObstacles(carPosition+20)) newPosition += GRID_WIDTH;
+        if (carDirection === 'right')
+          if ((carPosition + 1) % GRID_WIDTH < 19 && checkObstacles(carPosition+1)) newPosition += 1;
+        break;
+      case 'down':
+        if (carDirection === 'down')
+          if (carPosition-20 >= GRID_WIDTH && checkObstacles(carPosition-20)) newPosition -= GRID_WIDTH;
+        if (carDirection === 'up')
+          if (carPosition+20 < GRID_WIDTH * (GRID_HEIGHT - 1) && checkObstacles(carPosition+20)) newPosition += GRID_WIDTH;
+        if (carDirection === 'left')
+          if ((carPosition + 1) % GRID_WIDTH < 19 && checkObstacles(carPosition+1)) newPosition += 1;
+        if (carDirection === 'right')
+          if ((carPosition % GRID_WIDTH)-1 !== 0 && checkObstacles(carPosition-1)) newPosition -= 1;
+        break;
+      case 'left':
+        if (carDirection === 'up')
+          if ((carPosition % GRID_WIDTH)-1 !== 0 && checkObstacles(carPosition-1)) newPosition -= 1;
+        if (carDirection === 'down')
+          if ((carPosition + 1) % GRID_WIDTH < 19 && checkObstacles(carPosition+1)) newPosition += 1;
+        if (carDirection === 'left')
+          if (carPosition+20 < GRID_WIDTH * (GRID_HEIGHT - 1) && checkObstacles(carPosition+20)) newPosition += GRID_WIDTH;
+        if (carDirection === 'right')
+          if (carPosition-20 >= GRID_WIDTH && checkObstacles(carPosition-20)) newPosition -= GRID_WIDTH;
+        break;
+      case 'right':
+        if (carDirection === 'up')
+          if ((carPosition + 1) % GRID_WIDTH < 19 && checkObstacles(carPosition+1)) newPosition += 1;
+        if (carDirection === 'down')
+          if ((carPosition % GRID_WIDTH)-1 !== 0 && checkObstacles(carPosition-1)) newPosition -= 1;
+        if (carDirection === 'left')
+          if (carPosition-20 >= GRID_WIDTH && checkObstacles(carPosition-20)) newPosition -= GRID_WIDTH;
+        if (carDirection === 'right')
+          if (carPosition+20 < GRID_WIDTH * (GRID_HEIGHT - 1) && checkObstacles(carPosition+20)) newPosition += GRID_WIDTH;
+        break;
+      default:
+        break;
+    }
+    setCarPosition(newPosition);
+    updateCarCoordinates(newPosition);
+  };
+  
+  const executeMovement = (direction, steps) => {
+    console.log("movement: ", direction, steps);
+    let newPosition = carPosition;
+    switch (direction) {
+      case 'up':
+        if (carDirection === 'up')
+          if (carPosition-(20*steps) >= GRID_WIDTH && checkObstacles(carPosition-(20*steps))) newPosition -= GRID_WIDTH*steps;
+        if (carDirection === 'left')
+          if (((carPosition-steps) % GRID_WIDTH)-1 !== 0 && checkObstacles(carPosition-steps)) newPosition -= steps;
+        if (carDirection === 'down')
+          if (carPosition+(20*steps) < GRID_WIDTH * (GRID_HEIGHT - 1) && checkObstacles(carPosition+(20*steps))) newPosition += GRID_WIDTH*steps;
+        if (carDirection === 'right')
+          if ((carPosition + steps) % GRID_WIDTH < 19 && checkObstacles(carPosition+steps)) newPosition += steps;
+        break;
+      case 'down':
+        if (carDirection === 'down')
+          if (carPosition-(20*steps) >= GRID_WIDTH && checkObstacles(carPosition-(20*steps))) newPosition -= GRID_WIDTH*steps;
+        if (carDirection === 'up')
+          if (carPosition+(20*steps) < GRID_WIDTH * (GRID_HEIGHT - 1) && checkObstacles(carPosition+(20*steps))) newPosition += GRID_WIDTH*steps;
+        if (carDirection === 'left')
+          if ((carPosition + steps) % GRID_WIDTH < 19 && checkObstacles(carPosition+steps)) newPosition += steps;
+        if (carDirection === 'right')
+          if (((carPosition-steps) % GRID_WIDTH)-1 !== 0 && checkObstacles(carPosition-steps)) newPosition -= steps;
+        break;
+      default:
+        break;
+      }
+    setCarPosition(newPosition);
+    updateCarCoordinates(newPosition);
+  };
+
+  const rotateCar = (direction) => {
+    const directions = ['up', 'right', 'down', 'left'];
+    const currentIndex = directions.indexOf(carDirection);
+    const newIndex = direction === 'left'
+      ? (currentIndex - 1 + directions.length) % directions.length
+      : (currentIndex + 1) % directions.length;
+    setCarDirection(directions[newIndex]);
+
+    console.log('Car is now facing', directions[newIndex]);
+  };
+
+  const isWithinGrid = (newPosition) => {
+    const row = Math.floor(newPosition / GRID_WIDTH);
+    const col = newPosition % GRID_WIDTH;
+  
+    // Ensure the 3x3 area is within bounds
+    const fitsVertically = row >= 1 && row <= GRID_HEIGHT - 2;
+    const fitsHorizontally = col >= 1 && col <= GRID_WIDTH - 2;
+  
+    return fitsVertically && fitsHorizontally;
+  };
+
+  const executeBR = () => {
+    let newPosition = carPosition;
+    console.log("initial position: ", newPosition);
+    switch (carDirection){
+      case 'up':
+        console.log("up");
+        newPosition += 3*20;
+        console.log("first new position: ", newPosition);
+        newPosition += 1;
+        console.log("second new position: ", newPosition);
+        break;
+      case 'down':
+        newPosition -= 3*GRID_WIDTH;
+        newPosition -= 1;
+        break;
+      case 'left':
+        newPosition += 3;
+        newPosition -= GRID_WIDTH;
+        break;
+      case 'right':
+        newPosition -= 3;
+        newPosition += GRID_WIDTH;
+        break;
+    }
+    if (isWithinGrid(newPosition)){
+      console.log("car position changed");
+      setCarPosition(newPosition);
+      rotateCar('left');
+    }
+  }
+
+  const executeBL = () => {
+    let newPosition = carPosition;
+    console.log("initial position: ", newPosition);
+    switch (carDirection){
+      case 'up':
+        newPosition += 3*20;
+        newPosition -= 1;
+        break;
+      case 'down':
+        newPosition -= 3*GRID_WIDTH;
+        newPosition += 1;
+        break;
+      case 'left':
+        newPosition += 3;
+        newPosition += GRID_WIDTH;
+        break;
+      case 'right':
+        newPosition -= 3;
+        newPosition -= GRID_WIDTH;
+        break;
+    }
+    if (isWithinGrid(newPosition)){
+      console.log("car position changed");
+      setCarPosition(newPosition);
+      rotateCar('right');
+    }
+  }
+
+  const executeFL = () => {
+    let newPosition = carPosition;
+    switch (carDirection){
+      case 'up':
+        newPosition -= 3;
+        newPosition -= GRID_WIDTH;
+        break;
+      case 'down':
+        newPosition += 3;
+        newPosition += GRID_WIDTH;
+        break;
+      case 'left':
+        newPosition += 3*GRID_WIDTH;
+        newPosition -= 1;
+        break;
+      case 'right':
+        newPosition -= 3*GRID_WIDTH;
+        newPosition += 1;
+        break;
+    }
+    if (isWithinGrid(newPosition)){
+      console.log("car position changed");
+      setCarPosition(newPosition);
+      rotateCar('left');
+    }
+  }
+
+  const executeFR = () => {
+    let newPosition = carPosition;
+    switch (carDirection){
+      case 'up':
+        newPosition += 3;
+        newPosition -= GRID_WIDTH;
+        break;
+      case 'down':
+        newPosition -= 3;
+        newPosition += GRID_WIDTH;
+        break;
+      case 'left':
+        newPosition -= 3*GRID_WIDTH;
+        newPosition -= 1;
+        break;
+      case 'right':
+        newPosition += 3*GRID_WIDTH;
+        newPosition += 1;
+        break;
+    }
+    if (isWithinGrid(newPosition)){
+      console.log("car position changed");
+      setCarPosition(newPosition);
+      rotateCar('right');
+    }
+  }
+
+  const computeCommands = () => {
+    // Call the query function from the API
+    QueryAPI.query(obst, carX, carY, directionConvert(carDirection), (data, err) => {
+      if (data) {
+        console.log("commands:");
+        console.log(data.data.commands);
+        setOptimalDistance(data.data.distance);
+        // Set the commands
+        let commandNumber = 0;
+        for (let x of data.data.commands) {
+          // If the command is a snapshot, skip it
+          // if (x.startsWith("SNAP")) {
+          //   continue;
+          // }
+          commandNumber++;
+          commandsRef.current.push(x);
+        }
+      }
+    });
+    setCommandsReceived('Yes');
+    setCommandNumber(commandNumber);
+    console.log("car position: ", carX, carY);
+  };
+
+  const computeBadCommands = () => {
+    // Call the query function from the API
+    QueryAPI.query(obst, carX, carY, directionConvert(carDirection), (data, err) => {
+      if (data) {
+        console.log("commands:")
+        console.log(data.data.commands)
+        setOptimalDistance(data.data.distance);
+        // Set the commands
+        for (let x of data.data.commands) {
+          // If the command is a snapshot, skip it
+          // if (x.startsWith("SNAP")) {
+          //   continue;
+          // }
+          commandsRef.current.push(x);
+        }
+      }
+    });
+    setCommandsReceived('Yes');
+
+    console.log("car position: ", carX, carY);
+  };
+
+  const executeCommands = () => {
+    if (commandsRef.current.length === 0){
+      return;
+    }
+    let command = commandsRef.current.shift();
+    console.log('command: ', command);
+    if (command.startsWith("BR")){
+      executeBR();
+    }
+    if (command.startsWith("BL")){
+      executeBL();
+    }
+    if (command.startsWith("FL")){
+      executeFL();
+    }
+    if (command.startsWith("FR")){
+      executeFR();
+    }
+    if (command.startsWith("FW")){
+      let steps = command[2];
+      let number = parseInt(steps, 10);
+      executeMovement('up', number);
+    }
+    if (command.startsWith("BW")){
+      let steps = command[2];
+      let number = parseInt(steps, 10);
+      executeMovement('down', number);
+    }
+    setCommandString(command);
+  }
+
+  const executeCommandsTest = () => {
+    if (commandsRef.current.length === 0) {
+      return;
+    }
+  
+    const executeNextCommand = () => {
+      if (commandsRef.current.length === 0) {
+        return;
+      }
+      
+      let newPosition = carPosition;
+      let command = commandsRef.current.shift();
+      console.log('command: ', command);
+      setCommandString(command);
+  
+      if (command.startsWith("BR")) {
+        executeBR();
+      } else if (command.startsWith("BL")) {
+        executeBL();
+      } else if (command.startsWith("FL")) {
+        executeFL();
+      } else if (command.startsWith("FR")) {
+        executeFR();
+      } else if (command.startsWith("FW")) {
+        let steps = command[2];
+        let number = parseInt(steps, 10);
+        newPosition = executeMovement('up', number);
+      } else if (command.startsWith("BW")) {
+        let steps = command[2];
+        let number = parseInt(steps, 10);
+        executeMovement('down', number);
+      }
+      setCarPosition(newPosition);
+      // Execute the next command after a delay
+      setTimeout(executeNextCommand, 2000); // Adjust delay as needed
+    };
+  
+    executeNextCommand();
+  };
+
+  return (
+    <div className='container'>
+      <div className="grid" style={{
+        display: 'grid',
+        gridTemplateColumns: `repeat(${GRID_WIDTH}, ${CELL_SIZE}px)`,
+        gridTemplateRows: `repeat(${GRID_HEIGHT}, ${CELL_SIZE}px)`,
+        gap: '1px'
+      }}>
+        {Array.from({ length: GRID_WIDTH * GRID_HEIGHT }, (_, index) => {
+          const isPath = carPath.includes(index);
+          const direction = obstacles.get(index);
+          const isObstacle = obstacles.has(index);
+          // Determine if the current index is part of the car
+          const carGrid = [
+            carPosition - GRID_WIDTH - 1, carPosition - GRID_WIDTH, carPosition - GRID_WIDTH + 1,
+            carPosition - 1, carPosition, carPosition + 1,
+            carPosition + GRID_WIDTH - 1, carPosition + GRID_WIDTH, carPosition + GRID_WIDTH + 1,
+          ];
+          let isBlueBlock = false;
+          if (carDirection === 'up') {
+            isBlueBlock = index === carPosition - GRID_WIDTH;
+          } else if (carDirection === 'down') {
+            isBlueBlock = index === carPosition + GRID_WIDTH;
+          } else if (carDirection === 'left') {
+            isBlueBlock = index === carPosition - 1;
+          } else if (carDirection === 'right') {
+            isBlueBlock = index === carPosition + 1;
+          }
+          // const blueBlockPosition = {
+          //   up: carPosition - GRID_WIDTH,
+          //   right: 5,
+          //   down: 7,
+          //   left: 3,
+          // }[carDirection];
+          const isCarPart = carGrid.includes(index);
+          // const isBlueBlock = carGrid[blueBlockPosition];
+          return (
+            <div
+              key={index}
+              className={`cell ${isPath ? 'path' : ''} ${isObstacle ? 'obstacle' : ''}`}
+              onClick={() => toggleObstacle(index)}
+              style={{
+                width: CELL_SIZE,
+                height: CELL_SIZE,
+                backgroundColor: isCarPart
+                ? isBlueBlock ? 'blue' : 'green'
+                : isObstacle ? 'red' : isPath ? 'lightgray' : 'white',
+                // backgroundColor: isPath ? 'lightgray' : isObstacle ? 'red' : 'lightgray',
+                border: '1px solid #ccc',
+                position: 'relative'
+              }}
+            >
+              {isObstacle && (
+                <div style={{
+                  position: 'absolute',
+                  width: '50%',
+                  height: '50%',
+                  backgroundColor: 'blue',
+                  ...(direction === 'up' && { top: 0, left: '50%', transform: 'translateX(-50%)' }),
+                  ...(direction === 'right' && { top: '50%', right: 0, transform: 'translateY(-50%)' }),
+                  ...(direction === 'down' && { bottom: 0, left: '50%', transform: 'translateX(-50%)' }),
+                  ...(direction === 'left' && { top: '50%', left: 0, transform: 'translateY(-50%)' }),
+                }} />
+              )}
+              </div>
+          );
+        })}
+        {/* {renderCar(carPosition)} */}
+      </div>
+      <div style={{ marginTop: '10px' }}>
+        {/* <button onClick={() => moveCar('up')}>Up</button>
+        <button onClick={() => moveCar('down')}>Down</button>
+        <button onClick={() => moveCar('left')}>Left</button>
+        <button onClick={() => moveCar('right')}>Right</button>
+        <button onClick={() => rotateCar('left')}>Rotate Left</button>
+        <button onClick={() => rotateCar('right')}>Rotate Right</button>
+        <button onClick={executeBR}>BR</button>
+        <button onClick={executeBL}>BL</button>
+        <button onClick={executeFR}>FR</button>
+        <button onClick={executeFL}>FL</button> */}
+        <button onClick={resetObstacles}>Reset Obstacles</button>
+        <button onClick={resetCar}>Reset Car</button>
+        <button onClick={resetAll}>Reset All</button>
+        <button onClick={computeCommands}>Get Commands</button>
+        {/* <button onClick={computeCommands}>Get Bad Commands</button> */}
+        <button onClick={executeCommands}>Execute Commands</button>
+        {/* <button onClick={executeCommandsTest}>Execute Commands Test</button> */}
+      </div>
+      <div className='textContainer'>
+        <div style={{ marginTop: '10px' }}>
+          <p>{message2}</p>
+          <p>{commandsReceived}</p>
+        </div>
+        <div style={{ marginTop: '10px', marginLeft: '20px' }}>
+          <p>{message1}</p>
+          <p>{commandString}</p>
+        </div>
+        {/* <div style={{ marginTop: '10px', marginLeft: '20px' }}>
+          <p>{message3}</p>
+          <p>{commandNumber}</p>
+        </div> */}
+        {/* <div style={{ marginTop: '10px', marginLeft: '20px' }}>
+          <p>{message4}</p>
+          <p>{nonOptimalDistance}</p>
+        </div> */}
+      </div>
+    </div>
+    
+  );
+};
+
+export default App;

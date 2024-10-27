@@ -1,0 +1,38 @@
+from enum import Enum
+
+class Orientation(int, Enum):
+    UP = 0
+    RIGHT = 2
+    DOWN = 4
+    LEFT = 6
+    SKIP_TURN = 8
+
+    def __int__(self):
+        return self.value
+
+    @staticmethod
+    def rotation_penalty(o1, o2):
+        difference = abs(o1 - o2)
+        return min(difference, 8 - difference)
+
+MAX_ITERATIONS = 2000
+TURN_DIAMETER = 1
+
+OBSTACLE_PENALTY = 1000 
+PHOTO_COST = 50  
+
+TURN_MODIFIER = 1
+
+EXPANDED_ZONE = 1  
+
+GRID_WIDTH = 20
+GRID_HEIGHT = 20
+
+
+MOVE_ORIENTATION = [
+    (1, 0, Orientation.RIGHT),
+    (-1, 0, Orientation.LEFT),
+    (0, 1, Orientation.UP),
+    (0, -1, Orientation.DOWN),
+]
+

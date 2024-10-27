@@ -1,0 +1,115 @@
+import time
+from algo import MazeNavigator
+from flask import Flask, request, jsonify
+from flask_cors import CORS
+from helper import generate_commands
+import json
+
+app = Flask(__name__)
+CORS(app)
+
+@app.route('/path', methods=['POST'])
+def path_finding():
+    """
+    main api for getting path, returns in json, contains commands, paths and distance ( thou nto needed)
+    """
+    content = request.json
+
+    obstacles = content['obstacles']
+    retrying = content['retrying']
+    robot_x, robot_y = content['robot_x'], content['robot_y']
+    robot_direction = int(content['robot_dir'])
+
+    #Initialize the mazenavgator with dimensions, robot start position, orientation and whether we usign big turn
+    maze_solver = MazeNavigator(20, 20, robot_x, robot_y, robot_direction, large_turn=None)
+
+    # I CHANGED THIS PART -LQ
+    for ob in obstacles:
+        maze_solver.insert_obstacle(ob['x'], ob['y'], ob['d'], ob['id'])
+        print("This is the obstacle ID!!!!! : " + str(ob['id']))
+
+
+    start = time.time()
+    # Get shortest path
+    optimal_path, distance = maze_solver.retrieve_optimal_order_dp(retrying=retrying)
+    print(f"Time taken to find shortest path using A* search: {time.time() - start}s")
+    print(f"Distance to travel: {distance} units")
+    
+    # Based on the shortest path, generate commands for the robot
+    ori_commands = generate_commands(optimal_path, obstacles)
+
+    commands = []
+    for command in ori_commands:
+        if command == "FR00":
+            commands.extend(["BW05", command])
+        elif command == "FL00":
+            commands.extend(["BW05", command])
+        elif command == "BL00":
+            commands.extend([command, "FW05"])
+        elif command == "BR00":
+            commands.extend([command, "FW05"])
+        else:
+            commands.append(command)
+
+
+
+    # Get the starting location and add it to path_results
+    path_results = [optimal_path[0].get_dict()]
+    # Process each command individually and append the location the robot should be after executing that command to path_results
+    i = 0
+    
+    for command in commands:
+        if command.startswith("SNAP"):
+            continue
+        if command.startswith("FIN"):
+            continue
+            # Skip if command is exactly "FW05" or "BW05"
+        if command == "FW05" or command == "BW05":
+            print("just add extra coord")
+        elif command.startswith("FW") or command.startswith("FS"):
+            i += int(command[2:]) // 10
+            print("i: " + str(i))
+            print("coordinates:")
+            print(optimal_path[i].get_dict())
+        elif command.startswith("BW") or command.startswith("BS"):
+            i += int(command[2:]) // 10
+            print("i: " + str(i))
+            print("coordinates:")
+            print(optimal_path[i].get_dict())
+        else:
+            i += 1
+            print("i: " + str(i))
+            print("coordinates:")
+            print(optimal_path[i].get_dict())
+        print("length of optimal path:" + str(len(optimal_path)))
+        path_results.append(optimal_path[i].get_dict())
+
+    print(commands)
+    print("optimal path:")
+    print(optimal_path)
+    print("path results:")
+    print(path_results)
+    
+    # Prepare the data for the response
+    response_data = {
+        "data": {
+            'distance': distance,
+            'path': path_results,
+            'commands': commands
+        },
+        "error": None
+    }
+    # Print the response data (as a pretty-printed JSON string)
+    print(json.dumps(response_data, indent=4))
+
+    return jsonify({
+        "data": {
+            'distance': distance,
+            'path': path_results,
+            'commands': commands
+        },
+        "error": None
+    })
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000, debug=True)

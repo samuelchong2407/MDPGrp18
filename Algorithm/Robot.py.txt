@@ -1,0 +1,16 @@
+from typing import List
+from Entity import GridComponent
+from consts import Orientation
+
+
+class Robot:
+    def __init__(self, center_x: int, center_y: int, start_direction: Orientation):
+        """ robot class contains the coord of its center and its orientation
+        """
+        self.states: List[GridComponent] = [
+            GridComponent(center_x, center_y, start_direction)]
+
+    def get_start_state(self):
+        """return state state 
+        """
+        return self.states[0]
